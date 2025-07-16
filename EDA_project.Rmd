@@ -1,0 +1,365 @@
+---
+title: "EDA - New York air quality analysis"
+author: "Gómez-Alonso, I."
+date: "2025-06-13"
+output:
+  html_document: default
+  pdf_document: 
+    highlight: tango
+    toc: True
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### **1. Introduction**
+
+This project presents an Exploratory Data Analysis (EDA) of the airquality dataset, a dataset available in RStudio  <https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/airquality.html>.
+
+The general purpose of this study is to analyze the temporal distribution of the main air quality variables (ozone, solar radiation, wind and temperature) during the study period, identifying seasonal or monthly trends in ozone levels and other variables, as well as to evaluate the relationship and possible significant correlations between ozone concentration and environmental variables such as temperature, wind speed and solar radiation.
+
+#### **1.1. Dataset description**
+
+The airquality dataset contains daily air quality measurements in New York City taken between May and September 1973. It includes the following key variables:
+
+- Ozone: Mean ozone in parts per billion (ppb) from 1300 to 1500 hours at Roosevelt Island
+
+- Solar.R: Solar radiation in Langleys in the frequency band 4000–7700 Angstroms from 0800 to 1200 hours at Central Park
+
+- Wind: Average wind speed in miles per hour (mph) at 0700 and 1000 hours at LaGuardia Airport
+
+- Temp: Maximum daily temperature in degrees Fahrenheit (°F) at LaGuardia Airport 
+
+- Month: The month of the observation (5 through 9, representing   May through September)
+
+- Day: The day of the month of the observation (1 -31)
+
+The data were obtained from the New York State Department of Conservation (ozone data) and the National Weather Service (meteorological data).
+
+
+### **2. Data preparation and exploration**
+
+Let's start by loading the dataset in our Rstudio environment and perform an initial inspection to familiarize ourselves with its dimensions, the type of variables it contains and the first rows of data.
+
+
+#### **2.1. Data loading and initial inspection**
+
+
+First, we start by loading the required libraries.
+```{r warning=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+
+Next, we load the airquality dataset, this is easily accomplished, since airquality is a built-in dataset in R, which avoids the need to import external files.
+```{r airquality}
+data_air <- airquality # assign the dataset in a variable
+```
+
+
+Once loaded, we will perform an initial inspection to get an overview of the information.
+We will start by using basic functions such as *dim*() to get the dimensions of the database.
+```{r}
+dim(data_air) #dataset size
+```
+<span style="color: blue;">The dataset contains 153 rows and 6 columns.</span>
+
+
+The *head*() function allows us to view the first few rows of the dataset, which will give us a quick look at the structure of the data and the type of values contained in each column.
+```{r}
+head(airquality) #first rows in data
+```
+
+
+Next, The *summary*() function provides a quick overview of the distribution of the variables, helps to identify possible outliers (by looking at ranges and quartiles) and detects the presence of missing values.
+```{r}
+summary(data_air) #summary of variables in data
+```
+
+
+Key findings by variable:
+
+ - <span style="color: blue;">**Ozone (Ozone Concentration)**: 
+    
+    - Ozone concentration shows a considerable range, from a low of 1 ppb to a high of 168 ppb.
+  
+    - The mean (42.13 ppb) is notably higher than the median (31.50 ppb), suggesting a positive asymmetric distribution (skewed to the right), indicating the presence of some exceptionally high ozone values.
+  
+    - A critical aspect is the presence of 37 missing values (NA's), which represent a significant portion of the observations for this variable and will require careful consideration during the cleaning phase. 
+  
+ - <span style="color: blue;">**Solar.R (Solar Radiation)**: 
+ 
+    - Solar radiation fluctuates from 7 Langleys to 334 Langleys.
+  
+    - The mean (185.9 Langleys) and median (205.0 Langleys) are relatively close, suggesting a more symmetrical distribution than ozone, although the median is slightly higher, indicating a slight asymmetry towards lower values.
+  
+    - Seven missing values (NA's) were identified in this variable, a smaller number than in Ozone, but still in need of attention.
+  
+ - <span style="color: blue;">**Wind (Wind Speed)**:
+
+    - Wind speed ranges from 1.7 mph to 20.7 mph.
+  
+    - The mean (9.958 mph) and median (9.700 mph) are very similar, indicating a fairly symmetrical distribution for wind speed, with most values concentrated around the mean.
+  
+    - No missing values were observed for this variable, which simplifies its handling.
+  
+ - <span style="color: blue;">**Temp (Temperature)**:
+
+    - The reported temperature ranges from 56°F to 97°F.
+  
+    - The mean (77.88°F) and median (79.00°F) are very close, suggesting a relatively symmetrical temperature distribution.
+  
+    - The quartiles indicate that most of the temperatures are between 72°F and 85°F.
+  
+    - There are no missing values for the temperature variable.
+
+ - <span style="color: blue;">**Month and Day**:
+
+The variables **Month** and **Day** are of discrete type and act as temporal identifiers.
+Month spans from month 5 (May) to month 9 (September), confirming the study period.
+Day ranges from day 1 to day 31, as would be expected for a daily record.
+They have no missing values, and their descriptive statistics reflect their nature as time indices.
+
+
+
+
+Finally, *str*() will provide us with the internal structure of the dataset, showing the column names, their data types (**numeric**, **integer**, etc.) and the number of observations.
+
+```{r}
+str(data_air) #structure of dataset
+```
+An *int* (integer) is a numeric data type used to store whole numbers without any decimal component. A *num* (numeric),it's used to store numbers that can have decimal components.
+
+
+
+#### **2.2. Data cleaning**
+
+Due to the nature of the dataset, it is possible that there are no duplicate rows, however, it is important to corroborate
+```{r}
+num_duplicated <- sum(duplicated(data_air)) #verify duplicated rows
+print(num_duplicated)
+```
+<span style="color: blue;">This dataset has no rows with duplicate data.
+
+
+
+##### **2.2.1 Missing value management strategy (NA)**:
+
+```{r}
+colSums(is.na(data_air)) #Counting NA's by column
+```
+  
+<span style="color: blue;">Given the nature of this dataset (daily air quality records) and the number of NAs (37 in Ozone out of 153 observations, and 7 in Solar.R), there are several possible strategies:
+
+  **a) Imputation**: Replace the NAs with an estimated value (mean, median, mode, or using more complex models). This option is more sophisticated and seeks to preserve the size of the dataset, but introduces a “falsification” of data that could bias the results if the imputation is not adequate.
+  
+  **b) Removal of entire rows (na.omit())**: This is the simplest and most straightforward option. It deletes any row containing at least one NA in any of its columns. While easy to implement, it may result in the loss of a significant amount of data if there are many NAs distributed in different rows.
+
+<span style="color: orange;">For this EDA and given that the main objective is to explore clear patterns and relationships, we will opt for the *elimination of complete rows*. This decision is justified because:
+
+- The number of NAs in Ozone is significant, and imputation could distort key distributions or relationships.
+
+- For Solar.R, even though they are few, removing them simplifies the dataset without losing critical information.
+
+- We want to ensure that any correlation or pattern analysis is based on complete and reliable observations.
+
+In order to implement the elimination of rows with NAs, the *na.omit()* function is used.
+  
+```{r}
+data_air_clean <- na.omit(data_air) # Remove all rows containing at least one NA
+
+dim(data_air_clean) # Check dimensions of new data frame
+```
+<span style="color: blue;">A new dataframe called *data_air_clean* was created. Out of 153 original rows, we are left with 111 rows. That's a loss of 42 rows (37 from Ozone + 5 additional rows where Solar.R had NA and Ozone did not).
+
+
+```{r}
+colSums(is.na(data_air_clean)) # Check again for presence of NA's to confirm cleanup
+summary(data_air_clean) # Verify again the summary 
+```
+
+#### **2.3. Descriptive statistics**
+```{r}
+numeric_cols_clean <- c("Ozone", "Solar.R", "Wind", "Temp") # Define the numerical columns of interest
+```
+
+```{r}
+descriptive_stats_clean <- data_air_clean %>% # Calculate the descriptive statistics for each column of the clean dataframe.
+  select(all_of(numeric_cols_clean)) %>% # Select only the numerical columns that interest us
+  summarise( # Summarize each column
+    # Ozone
+    Ozone_Mean = mean(Ozone, na.rm = TRUE),
+    Ozone_Median = median(Ozone, na.rm = TRUE),
+    Ozone_SD = sd(Ozone, na.rm = TRUE),
+    Ozone_N = n(),
+    
+    # Solar radiation
+    SolarR_Mean = mean(Solar.R, na.rm = TRUE),
+    SolarR_Median = median(Solar.R, na.rm = TRUE),
+    SolarR_SD = sd(Solar.R, na.rm = TRUE),
+    SolarR_N = n(),
+
+    # Wind
+    Wind_Mean = mean(Wind, na.rm = TRUE),
+    Wind_Median = median(Wind, na.rm = TRUE),
+    Wind_SD = sd(Wind, na.rm = TRUE),
+    Wind_N = n(),
+
+    # Temperature
+    Temp_Mean = mean(Temp, na.rm = TRUE),
+    Temp_Median = median(Temp, na.rm = TRUE),
+    Temp_SD = sd(Temp, na.rm = TRUE),
+    Temp_N = n()
+  ) %>%
+  # Use pivot_longer to transform the table from width to length
+  pivot_longer(
+    cols = everything(), # Select all columns
+    names_to = c("Variable", ".value"), # Split the names in ‘Variable’ and the type of statistic
+    names_pattern = "(.+)_(Mean|Median|SD|N)" # regex pattern to extract the variable and the statistic
+  )
+
+print(descriptive_stats_clean) # Show the resulting table
+```
+
+
+### **3. Exploratory Data Analysis (EDA)**
+
+<span style="color: blue;">**Ozone vs. temperature relationship:**
+```{r}
+ggplot(data_air_clean, aes(x = Temp, y = Ozone)) +
+  geom_point(alpha = 0.6, color = "darkblue") + 
+  geom_smooth(method = "lm", se = FALSE, color = "red") + # Add a linear regression line
+  labs(title = "Ozone vs. Temperature",
+       x = "Temperature (°F)",
+       y = "Ozone (ppb)") +
+  theme_minimal()
+```
+
+<span style="color: darkblue;">We observe that as the temperature increases, the ozone concentration generally tends to increase as well. This indicates a *positive correlation* between temperature and ozone levels.
+
+<span style="color: darkblue;">Although there is a clear positive trend, the data points show considerable scatter around the trend line, especially at higher temperatures. This means that temperature is not the only determinant of ozone levels and that other factors can have an influence. For example, around 80°F, ozone levels vary widely from near 0 ppb to over 150 ppb.
+
+<span style="color: darkblue;">There are several cases where ozone levels are exceptionally high (e.g., above 150 ppb) at specific temperatures, especially in the 80°F-90°F range. These cases could be considered *outliers* that have not been accounted for.
+
+
+
+<span style="color: darkgreen;">**Ozone vs. wind relationship:**
+
+```{r}
+ggplot(data_air_clean, aes(x = Wind, y = Ozone)) +
+  geom_point(alpha = 0.6, color = "darkgreen") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Ozone vs. wind speed",
+       x = "wind speed (mph)",
+       y = "Ozone (ppb)") +
+  theme_minimal()
+```
+
+
+<span style="color: darkgreen;">The higher the wind speed, the lower the ozone concentration generally decreases. This suggests that higher wind speed is associated with lower ozone levels denoting a *negative linear relationship*.
+
+<span style="color: darkgreen;">This inverse relationship is expected because stronger winds tend to disperse pollutants, including ozone, reducing their concentration in a given area. Conversely, stagnant air conditions (low wind speed) can lead to ozone accumulation.
+
+<span style="color: darkgreen;">There are some data points, particularly at very low wind speeds (e.g., around 2-4 mph), where ozone levels are exceptionally high (e.g., above 150 ppb), indicating that very still air can lead to extreme ozone accumulation.
+
+
+
+<span style="color: Orange;">**Ozone vs. Solar radiation:**
+
+```{r}
+ggplot(data_air_clean, aes(x = Solar.R, y = Ozone)) +
+  geom_point(alpha = 0.6, color = "orange") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Ozone vs. Solar radiation",
+       x = "Solar radiation (langleys)",
+       y = "Ozone (ppb)") +
+  theme_minimal()
+```
+
+<span style="color: Orange;">With increasing solar radiation, the ozone concentration tends to increase, indicating a *weak positive relationship*.
+
+<span style="color: Orange;">There is a higher density of data points at higher solar radiation ranges, especially between 200 and 300 langleys.
+
+<span style="color: Orange;">Several points with remarkably high ozone concentrations (above 100 ppb) are observed at high solar radiation ranges.
+
+
+
+
+<span style="color: Purple;">**Average ozone per month**
+
+```{r}
+data_air_clean %>%
+  group_by(Month) %>%
+  summarise(Avg_Ozone = mean(Ozone, na.rm = TRUE)) %>%
+  ggplot(aes(x = Month, y = Avg_Ozone)) +
+  geom_line(color = "purple", size = 1.2) +
+  geom_point(color = "purple", size = 3) +
+  labs(title = "Ozone average per month",
+       x = "Month",
+       y = "Ozone average (ppb)") +
+  scale_x_continuous(breaks = 5:9, labels = c("May", "June", "July", "August", "September")) +
+  theme_minimal()
+```
+
+<span style="color: Purple;">Some seasonal patterns are observed such as increasing ozone levels in summer; ozone concentrations reach a significant peak during July and August, reaching almost 60 ppb. This suggests that the summer months experience the highest average ozone levels.
+
+<span style="color: Purple;">Decline into the fall; after the August peak, there is a sharp drop in mean ozone in September, falling back to just over 30 ppb.
+
+
+
+
+
+<span style="color: blue;">**Boxplot of ozone distribution by month:**
+
+
+```{r}
+ggplot(data_air_clean, aes(x = factor(Month), y = Ozone, fill = factor(Month))) +
+  geom_boxplot(na.rm = TRUE) +
+  labs(title = "Ozone distribution by month",
+       x = "Month",
+       y = "Ozone (ppb)") +  
+  scale_x_discrete(labels = c("May", "June", "July", "August", "September")) +
+  theme_minimal() +
+  guides(fill = "none")
+```
+
+May and June (spring) have the lowest ozone concentrations. The boxes are shorter and closer to the bottom of the graph, indicating lower average ozone levels and less variability. May has some atypical elevated ozone readings.
+
+July and August (summer peak) show a significant increase in ozone levels. The squares are much higher on the graph, which means that typical ozone concentrations are much higher. They also show wider squares and longer “whiskers,” suggesting greater variability in ozone levels during these summer months.
+
+In September (autumn decline), ozone levels begin to drop again, although they are still generally higher than in May. The box is lower than in July and August, showing a decrease in typical ozone values.
+
+There are several individual points (dots) above the “whiskers” in the box plots, especially in May and September. They represent outlier ozone readings, i.e., unusually high concentrations in those particular months.
+
+### **4. Questions**
+<span style="color: blue;">How are the main air quality variables (Ozone, Solar Radiation, Wind and Temperature) distributed over the study period?
+
+- Ozone: It presents a positive asymmetric distribution (skewed to the right), with a considerable range from 1 ppb to 168 ppb. The mean (42.13 ppb) is greater than the median (31.50 ppb), indicating exceptionally high values.
+- Solar Radiation: Fluctuations from 7 to 334 Langleys, with a more symmetrical distribution than ozone, as the mean (185.9 Langleys) and median (205.0 Langleys) are close.
+Wind: Range from 1.7 mph to 20.7 mph. The distribution is fairly symmetrical, with most values concentrated around the mean (9.958 mph) and median (9.700 mph).
+- Temperature: Range 56°F to 97°F. Relatively symmetrical distribution, with most temperatures between 72°F and 85°F.
+
+<span style="color: blue;">Are there seasonal or monthly trends in ozone levels and other variables? 
+
+- Ozone: Ozone levels show a clear seasonal pattern. They start relatively low in May (about 24 ppb on average) and increase in June (about 30 ppb). Ozone concentrations peak significantly during July and August, reaching nearly 60 ppb on average, indicating that the summer months experience the highest ozone levels. In September, there is a marked decrease in average ozone, returning to values near 30 ppb. 
+The distribution by month also shows greater variability in July and August.
+
+- Temperature and Ozone by Month: Temperature follows a similar seasonal trend, being higher in the summer months, which aligns with ozone peaks.
+
+
+<span style="color: blue;">What is the relationship between ozone concentration and other environmental variables such as temperature, wind speed and solar radiation?
+
+- Ozone vs. Temperature: There is a positive correlation. As temperature increases, ozone concentration tends to increase. However, there is considerable scatter in the data, especially at higher temperatures, suggesting that temperature is not the only factor. Exceptionally high ozone (over 150 ppb) is observed in the 80°F to 90°F range.
+
+- Ozone vs. Wind Speed: A negative linear relationship is observed. The higher the wind speed, the lower the ozone concentration tends to be. This is explained by the fact that high winds disperse pollutants, including ozone, while stagnant air conditions (low wind speed) can lead to ozone accumulation. There are data points with exceptionally high ozone levels at very low wind speeds (2-4 mph).
+
+- Ozone vs. Solar Radiation: There is a positive relationship. With increasing solar radiation, ozone concentration tends to increase. A higher density of data points is observed at higher solar radiation ranges, and several points with remarkably high ozone concentrations (greater than 100 ppb) occur at these higher radiation ranges.
+
+
+### **5. References**
+Chambers, J. M., Cleveland, W. S., Kleiner, B. and Tukey, P. A. (1983) Graphical Methods for Data Analysis. Belmont, CA: Wadsworth.
+
